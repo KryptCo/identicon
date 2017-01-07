@@ -1,6 +1,7 @@
 package com.docuverse.identicon;
 
-import java.awt.image.BufferedImage;
+import android.graphics.Bitmap;
+
 import java.math.BigInteger;
 
 /**
@@ -21,7 +22,7 @@ public interface IdenticonRenderer {
 	 *            image size
 	 * @return identicon image
 	 */
-	public BufferedImage render(int code, int size);
+	public Bitmap render(int code, int size);
 
 	/**
 	 * Returns rendered identicon image for given identicon code.
@@ -32,5 +33,5 @@ public interface IdenticonRenderer {
 	 *            image size
 	 * @return identicon image
 	 */
-	public BufferedImage render(BigInteger code, int size);
+	public Bitmap render(BigInteger code, int size);
 }

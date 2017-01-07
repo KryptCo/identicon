@@ -1,12 +1,11 @@
 package com.docuverse.identicon;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.Polygon;
-import java.awt.RenderingHints;
-import java.awt.Shape;
-import java.awt.geom.AffineTransform;
-import java.awt.image.BufferedImage;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+
 import java.math.BigInteger;
 
 /**
@@ -78,13 +77,13 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 
 	private int patchSize;
 
-	private Shape[] patchShapes;
+	private Path[] patchShapes;
 
 	// used to center patch shape at origin because shape rotation works
 	// correctly.
 	private int patchOffset;
 
-	private Color backgroundColor = Color.WHITE;
+	private int backgroundColor = Color.WHITE;
 
 	/**
 	 * Constructor.
@@ -118,40 +117,34 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 		this.patchOffset = patchSize / 2; // used to center patch shape at
 		// origin.
 		int scale = patchSize / PATCH_CELLS;
-		this.patchShapes = new Polygon[patchTypes.length];
+		this.patchShapes = new Path[patchTypes.length];
 		for (int i = 0; i < patchTypes.length; i++) {
-			Polygon patch = new Polygon();
+			Path path = new Path();
 			byte[] patchVertices = patchTypes[i];
 			for (int j = 0; j < patchVertices.length; j++) {
 				int v = (int) patchVertices[j];
 				int vx = (v % PATCH_GRIDS * scale) - patchOffset;
 				int vy = (v / PATCH_GRIDS * scale) - patchOffset;
-				patch.addPoint(vx, vy);
+				path.lineTo(vx, vy);
 			}
-			this.patchShapes[i] = patch;
+			this.patchShapes[i] = path;
 		}
 	}
 
-	public Color getBackgroundColor() {
+	public int getBackgroundColor() {
 		return backgroundColor;
 	}
 
-	public void setBackgroundColor(Color backgroundColor) {
+	public void setBackgroundColor(int backgroundColor) {
 		this.backgroundColor = backgroundColor;
 	}
 
-	public BufferedImage render(BigInteger code, int size) {
+	public Bitmap render(BigInteger code, int size) {
 		return renderQuilt(code.intValue(), size);
 	}
 
 	/**
 	 * Returns rendered identicon image for given identicon code.
-	 * 
-	 * <p>
-	 * Size of the returned identicon image is determined by patchSize set using
-	 * {@link setPatchSize}. Since a 9-block identicon consists of 3x3 patches,
-	 * width and height will be 3 times the patch size.
-	 * </p>
 	 * 
 	 * @param code
 	 *            identicon code
@@ -159,11 +152,11 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 	 *            image size
 	 * @return identicon image
 	 */
-	public BufferedImage render(int code, int size) {
+	public Bitmap render(int code, int size) {
 		return renderQuilt(code, size);
 	}
 
-	protected BufferedImage renderQuilt(int code, int size) {
+	protected Bitmap renderQuilt(int code, int size) {
 		// -------------------------------------------------
 		// PREPARE
 		//
@@ -195,12 +188,12 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 		// color components are used at top of the range for color difference
 		// use white background for now.
 		// TODO: support transparency.
-		Color fillColor = new Color(red << 3, green << 3, blue << 3);
+		int fillColor = Color.rgb(red << 3, green << 3, blue << 3);
 
 		// outline shapes with a noticeable color (complementary will do) if
 		// shape color and background color are too similar (measured by color
 		// distance).
-		Color strokeColor = null;
+		Integer strokeColor = null;
 		if (getColorDistance(fillColor, backgroundColor) < 32.0f)
 			strokeColor = getComplementaryColor(fillColor);
 
@@ -209,9 +202,10 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 		//
 
 		int sourceSize = patchSize * 3;
-		BufferedImage sourceImage = new BufferedImage(sourceSize, sourceSize,
-				BufferedImage.TYPE_INT_RGB);
-		Graphics2D g = sourceImage.createGraphics();
+		Bitmap sourceImage = Bitmap.createBitmap(sourceSize, sourceSize,
+				Bitmap.Config.ARGB_8888);
+		Canvas g = new Canvas();
+		g.setBitmap(sourceImage);
 
 		// middle patch
 		drawPatch(g, patchSize, patchSize, middleType, 0, middleInvert,
@@ -237,26 +231,25 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 		drawPatch(g, 0, patchSize * 2, cornerType, cornerTurn++, cornerInvert,
 				fillColor, strokeColor);
 
-		g.dispose();
+//		g.dispose();
 
 		// -------------------------------------------------
 		// SCALE TO TARGET SIZE
 		//
 		// Bicubic algorithm is used for quality scaling
 
-		BufferedImage targetImage = new BufferedImage(size, size,
-				BufferedImage.TYPE_INT_RGB);
-		g = targetImage.createGraphics();
-		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-				RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-		g.drawImage(sourceImage, 0, 0, size, size, null);
-		g.dispose();
+		Bitmap targetImage = Bitmap.createScaledBitmap(sourceImage, size, size, true);
+//		g = targetImage.createGraphics();
+//		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+//				RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+//		g.drawImage(sourceImage, 0, 0, size, size, null);
+//		g.dispose();
 
 		return targetImage;
 	}
 
-	private void drawPatch(Graphics2D g, int x, int y, int patch, int turn,
-			boolean invert, Color fillColor, Color strokeColor) {
+	private void drawPatch(Canvas g, int x, int y, int patch, int turn,
+			boolean invert, int fillColor, Integer strokeColor) {
 		assert patch >= 0;
 		assert turn >= 0;
 		patch %= patchTypes.length;
@@ -265,29 +258,36 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 			invert = !invert;
 
 		// paint background
-		g.setBackground(invert ? fillColor : backgroundColor);
-		g.clearRect(x, y, patchSize, patchSize);
+//		g.drawColor(invert ? fillColor : backgroundColor);
+		Paint bgPaint = new Paint();
+		bgPaint.setColor(invert? fillColor : backgroundColor);
+		g.drawRect(x, y, x + patchSize, y + patchSize, bgPaint);
 
 		// offset and rotate coordinate space by patch position (x, y) and
 		// 'turn' before rendering patch shape
-		AffineTransform saved = g.getTransform();
+
+		g.save();
 		g.translate(x + patchOffset, y + patchOffset);
-		g.rotate(Math.toRadians(turn * 90));
+		g.rotate(turn * 90);
 
 		// if stroke color was specified, apply stroke
 		// stroke color should be specified if fore color is too close to the
 		// back color.
 		if (strokeColor != null) {
-			g.setColor(strokeColor);
-			g.draw(patchShapes[patch]);
+			Paint patchPaint = new Paint();
+			patchPaint.setColor(strokeColor);
+			patchPaint.setStyle(Paint.Style.STROKE);
+			g.drawPath(patchShapes[patch], patchPaint);
 		}
 
 		// render rotated patch using fore color (back color if inverted)
-		g.setColor(invert ? backgroundColor : fillColor);
-		g.fill(patchShapes[patch]);
+		Paint patchPaint = new Paint();
+		patchPaint.setColor(invert? backgroundColor : fillColor);
+		patchPaint.setStyle(Paint.Style.FILL);
+		g.drawPath(patchShapes[patch], patchPaint);
 
 		// restore rotation
-		g.setTransform(saved);
+		g.restore();
 	}
 
 	/**
@@ -297,10 +297,10 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 	 * @param c2
 	 * @return
 	 */
-	private float getColorDistance(Color c1, Color c2) {
-		float dx = c1.getRed() - c2.getRed();
-		float dy = c1.getGreen() - c2.getGreen();
-		float dz = c1.getBlue() - c2.getBlue();
+	private float getColorDistance(int c1, int c2) {
+		float dx = Color.red(c1) - Color.red(c2);
+		float dy = Color.green(c1) - Color.green(c2);
+		float dz = Color.blue(c1) - Color.blue(c2);
 		return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
@@ -310,7 +310,7 @@ public class NineBlockIdenticonRenderer implements IdenticonRenderer {
 	 * @param color
 	 * @return
 	 */
-	private Color getComplementaryColor(Color color) {
-		return new Color(color.getRGB() ^ 0x00FFFFFF);
+	private int getComplementaryColor(int color) {
+		return color ^ 0x00FFFFFF;
 	}
 }

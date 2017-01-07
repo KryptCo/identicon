@@ -1,17 +1,13 @@
 package com.docuverse.identicon;
 
+import android.util.Log;
+
 import java.net.InetAddress;
 import java.security.MessageDigest;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  * Utility methods useful for implementing identicon functionality. Methods are
  * class methods for convenience.
- * <p>
- * Key method of interest is {@link getIdenticonCode} which converts IP address
- * into identicon code.<br>
  * <strong>IMPORTANT</strong>: <code>inetSalt</code> value must be set to
  * reasonably long random string prior to invoking this method.
  * </p>
@@ -19,7 +15,7 @@ import org.apache.commons.logging.LogFactory;
  * @author don
  */
 public class IdenticonUtil {
-	private static final Log log = LogFactory.getLog(IdenticonUtil.class);
+	private static final String TAG = "IdenticonUtil";
 
 	private static final int DEFAULT_IDENTICON_SIZE = 16;
 
@@ -134,7 +130,7 @@ public class IdenticonUtil {
 						.getByName(remoteAddr));
 			}
 		} catch (Exception e) {
-			log.error(e);
+			Log.e(TAG, e.toString());
 		}
 		return code;
 	}
@@ -151,7 +147,7 @@ public class IdenticonUtil {
 					size = MAXIMUM_IDENTICON_SIZE;
 			}
 		} catch (Exception e) {
-			log.error(e);
+			Log.e(TAG, e.toString());
 		}
 		return size;
 	}
